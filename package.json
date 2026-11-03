@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test --test-isolation=none test/telegram-bot.test.js"
   },
   "engines": {
     "node": "24.x"

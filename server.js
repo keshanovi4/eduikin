@@ -2,6 +2,7 @@ const http = require("node:http");
 const path = require("node:path");
 const { readFile } = require("node:fs/promises");
 const { handler: submitLead } = require("./netlify/functions/lead");
+const { createTelegramBot, webhookPath } = require("./telegram-bot");
 
 const assetsDirectory = path.join(__dirname, "assets");
 const bodyLimit = 32 * 1024;
@@ -29,7 +30,7 @@ function readBody(request) {
   });
 }
 
-function createServer() {
+function createServer({ telegramBot = createTelegramBot() } = {}) {
   return http.createServer(async (request, response) => {
     response.setHeader("X-Content-Type-Options", "nosniff");
     try {
@@ -38,6 +39,20 @@ function createServer() {
         pathname = decodeURIComponent(request.url.split("?")[0]);
       } catch {
         response.writeHead(400).end("Invalid URL");
+        return;
+      }
+
+      if (pathname === webhookPath) {
+        const result = await telegramBot.handleWebhook({
+          httpMethod: request.method,
+          headers: request.headers,
+          body: request.method === "POST" ? await readBody(request) : "",
+        });
+        response.writeHead(result.statusCode, {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "no-store",
+          ...result.headers,
+        }).end(result.body);
         return;
       }
 
@@ -93,8 +108,10 @@ function createServer() {
 
 if (require.main === module) {
   const port = Number(process.env.PORT || 3000);
-  createServer().listen(port, "0.0.0.0", () => {
+  const telegramBot = createTelegramBot();
+  createServer({ telegramBot }).listen(port, "0.0.0.0", () => {
     console.log(`DEIKIN listening on port ${port}`);
+    void telegramBot.start();
   });
 }
 
